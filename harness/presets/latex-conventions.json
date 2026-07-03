@@ -1,0 +1,40 @@
+{
+  // PRESET: LaTeX writing conventions — hardcoded structural discipline.
+  // Opt-in via "extends" (see 60-latex.json). Non-LaTeX projects are
+  // untouched. What this enforces mechanically:
+  //   L-FLOAT — every figure/table env has \caption AND \label;
+  //             no \includegraphics outside a float
+  //   L-XREF  — duplicate \label detection (in-file always; cross-file
+  //             in multi-file runs); \ref to unknown labels; float
+  //             labels (fig:/tab:/lst:) never referenced in prose
+  //             (corpus checks run on --all / pre-commit / CI /
+  //              stop gate, where 2+ files are scanned together)
+  //   NBSP    — warn on breaking space before \ref (use ~\ref{})
+  // Modular file-shape contracts are project-layout-specific: declare
+  // them in 60-latex.json under "file_shapes" (example there).
+
+  "latex_floats": {
+    "enabled": true,
+    "require_caption": true,
+    "require_label": true,
+    "graphics_in_float": true,
+    "severity": "error"
+  },
+
+  "latex_xref": {
+    "duplicates": "error",
+    "unknown_refs": "error",
+    "unreferenced_floats": "error",
+    "float_prefixes": ["fig:", "tab:", "lst:"]
+  },
+
+  "custom_rules": [
+    {
+      "id": "LX-NBSP",
+      "glob": "*.tex",
+      "pattern": "\\s\\\\(?:ref|autoref|cref)\\{",
+      "severity": "warn",
+      "message": "breaking space before reference — write '~\\ref{...}' so the number cannot wrap to the next line"
+    }
+  ]
+}

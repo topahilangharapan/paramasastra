@@ -172,7 +172,8 @@ def load_config(root):
 
 KNOWN_TOP_KEYS = {"project", "formats", "git", "protected_paths", "prose",
                   "latex_commands", "labels", "scope", "citations",
-                  "custom_rules", "enforcement", "workflow"}
+                  "custom_rules", "enforcement", "workflow",
+                  "file_shapes", "latex_floats", "latex_xref"}
 SEVERITIES = {"error", "warn", "off"}
 
 
@@ -208,6 +209,30 @@ def check_config(root, cfg):
             probs.append(f"prose.banned_patterns[{pid}] bad regex: {e}")
         if p.get("severity", "error") not in SEVERITIES:
             probs.append(f"prose.banned_patterns[{pid}].severity invalid")
+    for i, s in enumerate(cfg.get("file_shapes", [])):
+        sid = s.get("id", f"#{i}")
+        for fam_key in ("allow_only", "require"):
+            for p in s.get(fam_key, []):
+                try:
+                    re.compile(p)
+                except re.error as e:
+                    probs.append(f"file_shapes[{sid}].{fam_key} bad "
+                                 f"regex '{p}': {e}")
+        for f in s.get("forbid", []):
+            try:
+                re.compile(f.get("pattern", ""))
+            except re.error as e:
+                probs.append(f"file_shapes[{sid}].forbid bad regex: {e}")
+        if s.get("severity", "error") not in SEVERITIES:
+            probs.append(f"file_shapes[{sid}].severity invalid")
+    for key, fields in (("latex_floats", ("severity",)),
+                        ("latex_xref", ("duplicates", "unknown_refs",
+                                        "unreferenced_floats"))):
+        blk = cfg.get(key, {})
+        for f in fields:
+            v = blk.get(f, "error")
+            if v not in SEVERITIES:
+                probs.append(f"{key}.{f}='{v}' not in {sorted(SEVERITIES)}")
     dens = cfg.get("prose", {}).get("density", {})
     if dens:
         mode = dens.get("mode", "rate")
@@ -405,6 +430,134 @@ def check_bib_entries(entries, cfg, findings):
 
 
 WORD_RE = re.compile(r"[A-Za-z']+")
+LABEL_RE = re.compile(r"\\label\{([^}]+)\}")
+REF_RE = re.compile(r"\\(?:ref|eqref|autoref|cref|Cref|pageref|vref)\{([^}]+)\}")
+FLOAT_BEGIN = re.compile(r"\\begin\{(figure|table)\*?\}")
+FLOAT_END = re.compile(r"\\end\{(figure|table)\*?\}")
+
+
+def check_file_shapes(rel, text, cfg, findings):
+    """Whole-file structural contracts (e.g. 'a chapter root file holds
+    only \\chapter and \\input lines'). Declared in config as
+    file_shapes: [{id, glob, allow_only, require, forbid, severity}]."""
+    for shape in cfg.get("file_shapes", []):
+        if not fnmatch.fnmatch(rel, shape.get("glob", "*")):
+            continue
+        sev = shape.get("severity", "error")
+        sid = shape.get("id", "F-SHAPE")
+        allow = [re.compile(p) for p in shape.get("allow_only", [])]
+        forbid = shape.get("forbid", [])
+        required = {p: re.compile(p) for p in shape.get("require", [])}
+        found_req = set()
+        for n, raw in enumerate(text.splitlines(), 1):
+            line = strip_latex_comment(raw).strip()
+            if not line:
+                continue
+            for p, reg in required.items():
+                if reg.search(line):
+                    found_req.add(p)
+            for f in forbid:
+                if re.search(f.get("pattern", "(?!)"), line):
+                    findings.append(Finding(
+                        sev, sid, rel, n,
+                        f.get("message", "forbidden in this file shape")))
+            if allow and not any(a.search(line) for a in allow):
+                findings.append(Finding(
+                    sev, sid, rel, n,
+                    shape.get("message",
+                              "line not permitted by this file's shape "
+                              "contract") + f" (line: '{line[:60]}')"))
+        for p in required:
+            if p not in found_req:
+                findings.append(Finding(
+                    sev, sid, rel, 0,
+                    f"required pattern '{p}' missing from this file"))
+
+
+def check_latex_structure(rel, text, cfg, findings, xref_acc):
+    """Float integrity (caption+label per figure/table env, no stray
+    \\includegraphics) and label/ref collection for corpus-level
+    cross-reference checks."""
+    fl = cfg.get("latex_floats", {})
+    sev = fl.get("severity", "error")
+    in_float = None      # (env, start_line, has_caption, has_label, labels)
+    labels_here = {}     # name -> first line
+    xr = cfg.get("latex_xref", {})
+    for n, raw in enumerate(text.splitlines(), 1):
+        line = strip_latex_comment(raw)
+        m = FLOAT_BEGIN.search(line)
+        if m and fl.get("enabled", True):
+            in_float = [m.group(1), n, False, False]
+        if in_float:
+            if r"\caption" in line:
+                in_float[2] = True
+            if r"\label" in line:
+                in_float[3] = True
+        e = FLOAT_END.search(line)
+        if e and in_float and fl.get("enabled", True):
+            env, start, has_cap, has_lab = in_float
+            if fl.get("require_caption", True) and not has_cap:
+                findings.append(Finding(sev, "L-FLOAT", rel, start,
+                                        f"{env} environment has no \\caption"))
+            if fl.get("require_label", True) and not has_lab:
+                findings.append(Finding(sev, "L-FLOAT", rel, start,
+                                        f"{env} environment has no \\label"))
+            in_float = None
+        if fl.get("enabled", True) and fl.get("graphics_in_float", True) \
+                and r"\includegraphics" in line and not in_float:
+            findings.append(Finding(
+                sev, "L-FLOAT", rel, n,
+                "\\includegraphics outside a figure/table environment — "
+                "wrap it in a float with \\caption and \\label"))
+        for lm in LABEL_RE.finditer(line):
+            name = lm.group(1)
+            if name in labels_here:
+                if xr.get("duplicates", "error") != "off":
+                    findings.append(Finding(
+                        xr.get("duplicates", "error"), "L-XREF", rel, n,
+                        f"duplicate \\label{{{name}}} (first at line "
+                        f"{labels_here[name]})"))
+            else:
+                labels_here[name] = n
+            xref_acc["labels"].setdefault(name, []).append((rel, n))
+        for rm in REF_RE.finditer(line):
+            xref_acc["refs"].setdefault(rm.group(1), (rel, n))
+    xref_acc["files"] += 1
+
+
+def finalize_xref(cfg, xref_acc, findings):
+    """Corpus-level cross-reference checks — only meaningful when 2+
+    files were scanned together (--all, pre-commit, CI, stop gate);
+    a single file legitimately refs labels defined elsewhere."""
+    xr = cfg.get("latex_xref", {})
+    if xref_acc["files"] < 2:
+        return
+    dup_sev = xr.get("duplicates", "error")
+    if dup_sev != "off":
+        for name, sites in sorted(xref_acc["labels"].items()):
+            files = {s[0] for s in sites}
+            if len(files) > 1:
+                findings.append(Finding(
+                    dup_sev, "L-XREF", sites[1][0], sites[1][1],
+                    f"\\label{{{name}}} defined in multiple files: "
+                    f"{sorted(files)}"))
+    unk = xr.get("unknown_refs", "error")
+    if unk != "off":
+        for name, (f, n) in sorted(xref_acc["refs"].items()):
+            if name not in xref_acc["labels"]:
+                findings.append(Finding(
+                    unk, "L-XREF", f, n,
+                    f"\\ref{{{name}}} has no matching \\label in the "
+                    "scanned files"))
+    unrf = xr.get("unreferenced_floats", "error")
+    prefixes = tuple(xr.get("float_prefixes", ["fig:", "tab:", "lst:"]))
+    if unrf != "off":
+        for name, sites in sorted(xref_acc["labels"].items()):
+            if name.startswith(prefixes) and name not in xref_acc["refs"]:
+                findings.append(Finding(
+                    unrf, "L-XREF", sites[0][0], sites[0][1],
+                    f"float \\label{{{name}}} is never referenced in the "
+                    "text — every figure/table must be discussed"))
 
 
 def inflections(w):
@@ -769,7 +922,8 @@ def check_protected(root, rel, cfg, findings):
     return False
 
 
-def check_file(root, path, cfg, findings, bib_keys, chapter_acc=None):
+def check_file(root, path, cfg, findings, bib_keys, chapter_acc=None,
+               xref_acc=None):
     rel = relpath(root, path)
     if check_protected(root, rel, cfg, findings):
         return
@@ -790,6 +944,9 @@ def check_file(root, path, cfg, findings, bib_keys, chapter_acc=None):
     if zone is None:
         return  # outside manuscript/notes => not prose
     text = open(path, encoding="utf-8", errors="replace").read()
+    check_file_shapes(rel.replace(os.sep, "/"), text, cfg, findings)
+    if kind == "tex" and xref_acc is not None:
+        check_latex_structure(rel, text, cfg, findings, xref_acc)
     fw = check_prose_file(root, rel, text, kind, zone, cfg, findings, bib_keys)
     if chapter_acc is not None and zone == "manuscript" and fw is not None:
         d = os.path.dirname(rel.replace(os.sep, "/"))
@@ -885,9 +1042,11 @@ def main():
 
     targets = collect_all(root, cfg) if args.all else args.files
     chapter_acc = {}
+    xref_acc = {"labels": {}, "refs": {}, "files": 0}
     for f in targets:
-        check_file(root, f, cfg, findings, bib_keys, chapter_acc)
+        check_file(root, f, cfg, findings, bib_keys, chapter_acc, xref_acc)
     check_chapter_density(cfg, chapter_acc, findings)
+    finalize_xref(cfg, xref_acc, findings)
 
     errors = [f for f in findings if f.sev == "ERROR"]
     warns = [f for f in findings if f.sev == "WARN"]

@@ -50,6 +50,11 @@ harness/                     # merged in filename order; lists concatenate,
 ├── 70-workflow.json         # lifecycle markers + build command
 ├── 90-enforcement.json      # which checks run where
 ├── presets/                 # opt-in shared libraries (via "extends")
+│   ├── latex-conventions.json # float caption/label integrity, cross-
+│   │                          # reference checks (duplicates, unknown
+│   │                          # refs, unreferenced floats), ~\ref
+│   │                          # hygiene; file-shape contracts for
+│   │                          # modular writing declared in 60-latex
 │   ├── prose-anti-ai.json   # core forbidden vocabulary/phrases
 │   └── human-writing.json   # WP:AISIGNS machine-tell suppression:
 │                            #   banned constructions (regex patterns),
