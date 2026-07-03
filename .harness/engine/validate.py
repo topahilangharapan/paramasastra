@@ -424,7 +424,13 @@ def check_local_sources(root, entries, cfg, findings):
                 "If this source is not downloaded yet, it cannot be "
                 "cited: suggest it to the user instead"))
             continue
-        if not norm(fpath).startswith(shelf):
+        want = ls.get("type_dirs", {}).get(e["type"])
+        if want and not norm(fpath).startswith(norm(want)):
+            findings.append(Finding(
+                sev, "E-BIBSRC", e["file"], e["line"],
+                f"{e['key']}: @{e['type']} sources belong in '{want}' — "
+                f"file field points to '{fpath}'"))
+        elif not norm(fpath).startswith(shelf):
             findings.append(Finding(
                 sev, "E-BIBSRC", e["file"], e["line"],
                 f"{e['key']}: file field '{fpath}' is outside the shelf "

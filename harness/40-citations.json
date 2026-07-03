@@ -22,7 +22,17 @@
     "local_sources": {
       "enabled": true,
       "dir": "references/",
-      "severity": "error"
+      "severity": "error",
+      // Shelf sections: an entry's TYPE binds it to a subdirectory —
+      // an @article cannot hide in book/, a datasheet cannot pose as a
+      // paper. Types not listed only need to be somewhere under dir.
+      "type_dirs": {
+        "article":       "references/paper/",
+        "inproceedings": "references/paper/",
+        "incollection":  "references/paper/",
+        "book":          "references/book/",
+        "manual":        "references/manual/"
+      }
     },
     "verify_online": {
       "enabled": true,               // used by citecheck.py --online (CI)

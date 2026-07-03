@@ -1,7 +1,19 @@
 # references/ — the shelf
 
-Source PDFs live here. This directory is the **only** source of truth the
-AI may cite from, enforced by code, not convention:
+Source PDFs live here, sorted by type (enforced: an entry's BibTeX type
+must match its section):
+
+```
+references/
+├── paper/    @article, @inproceedings, @incollection — journal and
+│             conference papers
+├── book/     @book — published books
+└── manual/   @manual — official vendor documentation (datasheets,
+              user guides, e.g. Xilinx UG/DS documents)
+```
+
+This directory is the **only** source of truth the AI may cite from,
+enforced by code, not convention:
 
 - Every entry in `references.bib` must carry a
   `file = {references/<name>.pdf}` field pointing to a file that exists
@@ -29,6 +41,12 @@ Example entry:
   publisher = {Pearson},
   year      = {2013},
   isbn      = {978-0132774208},
-  file      = {references/mano2013-digital-design.pdf}
+  file      = {references/book/mano2013-digital-design.pdf}
 }
 ```
+
+Note: `@manual` is not in `allowed_types` by default — official vendor
+documentation is permitted via `type_exceptions` in
+`harness/40-citations.json` (e.g. `{"type": "manual",
+"key_prefix": "xilinx"}`), so only the vendors you explicitly trust
+can enter the bibliography as manuals.
