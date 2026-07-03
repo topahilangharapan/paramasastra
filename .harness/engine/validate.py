@@ -404,6 +404,39 @@ def parse_bibs(root, cfg):
     return keys, entries
 
 
+def check_local_sources(root, entries, cfg, findings):
+    """References-first shelf policy: every bib entry must carry a
+    file = {<shelf>/<name>.pdf} field pointing to a source file the user
+    physically placed on the shelf. A reference that was only suggested
+    (never downloaded) cannot enter the bibliography."""
+    ls = cfg.get("citations", {}).get("local_sources", {})
+    if not ls.get("enabled", False):
+        return
+    sev = ls.get("severity", "error")
+    shelf = norm(ls.get("dir", "references/")).rstrip("/") + "/"
+    for e in entries:
+        fpath = e["fields"].get("file", "").strip().strip("{}").strip()
+        if not fpath:
+            findings.append(Finding(
+                sev, "E-BIBSRC", e["file"], e["line"],
+                f"{e['key']}: no file field — every entry must point at "
+                f"its source on the shelf (file = {{{shelf}<name>.pdf}}). "
+                "If this source is not downloaded yet, it cannot be "
+                "cited: suggest it to the user instead"))
+            continue
+        if not norm(fpath).startswith(shelf):
+            findings.append(Finding(
+                sev, "E-BIBSRC", e["file"], e["line"],
+                f"{e['key']}: file field '{fpath}' is outside the shelf "
+                f"directory '{shelf}'"))
+        elif not os.path.isfile(os.path.join(root, fpath)):
+            findings.append(Finding(
+                sev, "E-BIBSRC", e["file"], e["line"],
+                f"{e['key']}: file field points to '{fpath}' which does "
+                "not exist — the user has not placed this source on the "
+                "shelf; it cannot be cited yet"))
+
+
 def check_bib_entries(entries, cfg, findings):
     cit = cfg.get("citations", {})
     allowed = [t.lower() for t in cit.get("allowed_types", [])]
@@ -1039,6 +1072,7 @@ def main():
 
     bib_keys, entries = parse_bibs(root, cfg)
     check_bib_entries(entries, cfg, findings)
+    check_local_sources(root, entries, cfg, findings)
 
     targets = collect_all(root, cfg) if args.all else args.files
     chapter_acc = {}

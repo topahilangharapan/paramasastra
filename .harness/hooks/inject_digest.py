@@ -52,6 +52,15 @@ if cit.get("allowed_types"):
                  "every cite key must already exist in "
                  f"{cit.get('bib_files')}; never invent a reference — "
                  "identifiers (DOI/ISBN) are verified online in CI.")
+ls = cit.get("local_sources", {})
+if ls.get("enabled"):
+    lines.append(f"3b. REFERENCES-FIRST: cite ONLY sources physically in "
+                 f"{ls.get('dir', 'references/')} (bib entries need a "
+                 "file field pointing there — validator blocks the rest). "
+                 "Shelf insufficient? Say which claims lack sources and "
+                 "ask before searching the web; found references are "
+                 "SUGGESTIONS the user must download to the shelf before "
+                 "you may cite them.")
 lines.append("4. Prose: no em-dashes, no forbidden AI vocabulary, no machine "
              "constructions — validator enforces on every edit. Judgment "
              "tells it cannot catch: vary list lengths (break the "

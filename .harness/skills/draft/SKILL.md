@@ -28,7 +28,12 @@ re-checks each file you touch, automatically, and blocks violations.
    process them in change-id order.
 4. **Blockers — STOP AND ASK, never work around:**
    - a briefed source key missing from the bibliography
-   - a source the brief needs that the user has not provided
+   - a source the brief needs that is not on the shelf (`references/`) —
+     references-first: you may propose a web search for candidates, but
+     found references are SUGGESTIONS ONLY; the user downloads the PDF
+     into `references/` and only then may you add the bib entry (with
+     its `file` field) and cite it — the validator (E-BIBSRC) and web
+     gate enforce this regardless
    - a figure/table/asset slot whose file does not exist
    - the user's own methods/results referenced but never described
    - an `@EDIT[...|REWRITE]` with no matching ORIGINAL block (the

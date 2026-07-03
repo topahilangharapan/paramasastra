@@ -30,6 +30,14 @@ def deny(msg):
     sys.exit(2)
 
 
+def ask(reason):
+    print(json.dumps({"hookSpecificOutput": {
+        "hookEventName": "PreToolUse",
+        "permissionDecision": "ask",
+        "permissionDecisionReason": reason}}))
+    sys.exit(0)
+
+
 def main():
     try:
         data = json.load(sys.stdin)
@@ -47,6 +55,23 @@ def main():
     tool = data.get("tool_name", "")
     ti = data.get("tool_input", {}) or {}
 
+    # WEB GATE — references-first policy: no silent internet access
+    wg = cfg.get("enforcement", {}).get("web_gate", {})
+    if tool in ("WebFetch", "WebSearch"):
+        mode = wg.get("mode", "ask")
+        if mode == "deny":
+            deny("BLOCKED by harness (web_gate: deny): internet access is "
+                 "disabled. Work from the local shelf (references/). If it "
+                 "is insufficient, tell the user which claims lack sources "
+                 "and ask them to change web_gate.mode or add sources.")
+        if mode == "ask":
+            ask("References-first policy: web access is only for reference "
+                "DISCOVERY after the local shelf (references/) is "
+                "insufficient. Found references may only be SUGGESTED — "
+                "the user downloads them into references/ before they can "
+                "be cited. Approve this web request?")
+        sys.exit(0)
+
     if tool == "Bash":
         cmd = ti.get("command", "")
         if git.get("enabled", True):
@@ -59,6 +84,14 @@ def main():
                 deny(f"BLOCKED by harness: committing on '{branch(root)}' is "
                      "forbidden. Create a branch: git checkout -b "
                      f"{'|'.join(git.get('branch_prefixes', ['feat/']))}<topic>")
+
+        # Web gate also covers shell fetchers
+        if wg.get("block_bash_fetch", True) and \
+                re.search(r"\b(curl|wget|httpie|http)\s", cmd):
+            deny("BLOCKED by harness (web_gate): shell downloads bypass "
+                 "the references-first gate. Use the WebFetch/WebSearch "
+                 "tools (which ask the user) or have the user download "
+                 "sources into references/ themselves.")
 
         # Bash mutation guard — closes the shell bypass around Edit/Write
         bg = cfg.get("enforcement", {}).get("bash_guard", {})

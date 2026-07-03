@@ -29,6 +29,17 @@
     // Edit/Write hooks:
     "bash_guard": {
       "enabled": true
+    },
+    // WEB GATE (references-first): the AI may not reach the internet
+    // silently. "ask" = every WebFetch/WebSearch requires the user's
+    // interactive approval (the flow: AI declares the local shelf
+    // insufficient -> user approves the search -> AI only SUGGESTS
+    // references -> user downloads into references/ -> only then can it
+    // be cited, because local_sources requires the file to exist).
+    // "deny" = no web at all; "allow" = unrestricted.
+    "web_gate": {
+      "mode": "ask",
+      "block_bash_fetch": true   // also block curl/wget in the shell
     }
   }
 }

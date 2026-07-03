@@ -13,6 +13,17 @@
       "book": ["publisher", "year", "author", "title"]
     },
     "cite_keys_must_exist": true,   // every \cite / @key must be in a bib file
+
+    // REFERENCES-FIRST POLICY (the shelf): every bib entry must point at
+    // a source file the user physically placed in the shelf directory,
+    // via a `file = {references/<name>.pdf}` field. You cannot cite what
+    // is not on the shelf — a suggested-but-not-downloaded reference
+    // cannot enter the bibliography. Pairs with enforcement.web_gate.
+    "local_sources": {
+      "enabled": true,
+      "dir": "references/",
+      "severity": "error"
+    },
     "verify_online": {
       "enabled": true,               // used by citecheck.py --online (CI)
       "doi_resolver": "crossref",
