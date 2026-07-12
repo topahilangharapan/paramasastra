@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Pramana — versioned, validation-gated builds.
+"""Paramasastra — versioned, validation-gated builds.
 
 Every build gets its own folder under build/ named
     <YYYY-MM-DD_HHMMSS>_v<N>

@@ -1,4 +1,4 @@
-# Pramana
+# Paramasastra
 
 A hardcoded AI-harness for academic research and journal writing. The idea:
 markdown instructions to an AI are *advisory* — the model can drift or
@@ -7,10 +7,11 @@ into **code that runs deterministically**, and keeps only judgment rules
 (scope, argument quality, source fidelity) in instructions, refreshed into
 the AI's context every single turn.
 
-The name is Sanskrit: **pramāṇa** (प्रमाण), a *means of valid knowledge* —
-the epistemological standard by which a claim counts as proven. That is the
-contract this harness enforces: a citation must exist, an identifier must
-resolve, a rule must hold — or the work does not pass.
+The name is Indonesian, from Sanskrit: **paramasastra** — *parama*
+(supreme) + *śāstra* (science, treatise) — the classical term for the
+science of language rules. That is what this harness is: the codified
+rules of scholarly writing — citations, prose, scope, git, LaTeX —
+enforced as law, not suggested as style.
 
 ## Design decisions (and why)
 
@@ -29,7 +30,7 @@ resolve, a rule must hold — or the work does not pass.
 ```bash
 # 1. Create a new project from this template
 #    (or click "Use this template" on GitHub)
-gh repo create my-new-paper --template topahilangharapan/pramana --private --clone
+gh repo create my-new-paper --template topahilangharapan/paramasastra --private --clone
 cd my-new-paper
 
 # 2. Edit the config fragments in harness/:
